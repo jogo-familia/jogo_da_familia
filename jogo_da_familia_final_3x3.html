@@ -1,0 +1,311 @@
+﻿<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>🎰 Jogo da Família</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+    margin:0;
+    font-family:'Trebuchet MS', Arial, sans-serif;
+    background:radial-gradient(circle at top,#ffcc66,#ff8c00);
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    min-height:100vh;
+}
+
+.game{
+    background:linear-gradient(180deg,#fff,#f6f6f6);
+    width:100%;
+    max-width:400px;
+    border-radius:24px;
+    padding:16px;
+    box-shadow:0 20px 40px rgba(0,0,0,.35);
+}
+
+.top{
+    background:linear-gradient(180deg,#fff1cc,#ffe1a3);
+    border-radius:16px;
+    padding:12px;
+    font-size:13px;
+    margin-bottom:10px;
+}
+
+.title{
+    text-align:center;
+    font-size:22px;
+    font-weight:900;
+}
+
+.info{
+    display:flex;
+    justify-content:space-between;
+    font-weight:800;
+}
+
+.grid{
+    background:#ddd;
+    border-radius:18px;
+    padding:10px;
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:10px;
+    margin:14px 0;
+}
+
+.cell{
+    aspect-ratio:1/1;
+    border-radius:50%;
+    background:#fff;
+    border:3px solid #eee;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+}
+
+.cell.win{
+    border-color:#ff7b00;
+    box-shadow:0 0 15px #ff7b00;
+}
+
+.cell img{
+    width:98%;
+    height:98%;
+    object-fit:cover;
+    border-radius:50%;
+}
+
+.controls{
+    display:flex;
+    gap:10px;
+    margin-bottom:8px;
+}
+
+.audio-controls{
+    display:flex;
+    gap:8px;
+    align-items:center;
+}
+
+select,button,input[type=range]{
+    flex:1;
+    padding:12px;
+    border:none;
+    border-radius:14px;
+    font-size:14px;
+    font-weight:800;
+}
+
+button{
+    background:linear-gradient(180deg,#ff9a00,#ff6a00);
+    color:#fff;
+    box-shadow:0 6px 0 #d85a00;
+}
+
+button:active{
+    transform:translateY(2px);
+    box-shadow:0 4px 0 #d85a00;
+}
+
+.status{
+    text-align:center;
+    font-weight:900;
+    margin-top:8px;
+    min-height:24px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="game">
+    <div class="top">
+        <div class="title">🎰 Jogo da Família</div>
+        <div class="info">
+            <div>⭐ <span id="points">1000</span></div>
+            <div>Aposta: <span id="betValue">10</span></div>
+        </div>
+        <small>3 iguais em linha (horizontal ou diagonal)</small>
+    </div>
+
+    <div class="grid" id="grid"></div>
+
+    <div class="controls">
+        <select id="bet" onchange="updateBet()">
+            <option value="10">10</option>
+            <option value="20">20</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+        </select>
+        <button onclick="spin()">GIRAR</button>
+    </div>
+
+    <div class="audio-controls">
+        <button onclick="toggleMusic()" id="musicBtn">🎵 Música OFF</button>
+        <input type="range" min="0" max="100" value="40" onchange="setVolume(this.value)">
+    </div>
+
+    <div class="status" id="status">Boa sorte 🍀</div>
+</div>
+
+<script>
+let points = 1000;
+let bet = 10;
+let spinning = false;
+
+const pointsEl = document.getElementById("points");
+const statusEl = document.getElementById("status");
+const gridEl = document.getElementById("grid");
+
+/* 🔊 áudio */
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+const masterGain = audioCtx.createGain();
+masterGain.gain.value = 0.4;
+masterGain.connect(audioCtx.destination);
+
+function playSound(freq, duration=0.1, type="square"){
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.value = 0.15;
+    osc.connect(gain);
+    gain.connect(masterGain);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+}
+
+function spinSound(){ playSound(220,0.05); }
+function stopSound(){ playSound(120,0.1,"sawtooth"); }
+function winSound(){
+    playSound(600,0.12);
+    setTimeout(()=>playSound(800,0.12),120);
+    setTimeout(()=>playSound(1000,0.15),240);
+}
+function loseSound(){ playSound(90,0.25,"triangle"); }
+
+let musicOsc=null, musicOn=false;
+function toggleMusic(){
+    audioCtx.resume();
+    if(!musicOn){
+        musicOsc=audioCtx.createOscillator();
+        musicOsc.type="triangle";
+        musicOsc.frequency.value=140;
+        musicOsc.connect(masterGain);
+        musicOsc.start();
+        musicBtn.innerText="🎵 Música ON";
+        musicOn=true;
+    }else{
+        musicOsc.stop();
+        musicOsc=null;
+        musicBtn.innerText="🎵 Música OFF";
+        musicOn=false;
+    }
+}
+function setVolume(v){ masterGain.gain.value=v/100; }
+
+/* 🎰 símbolos */
+const symbols = [
+    ...Array(4).fill({type:"ana", img:"ana_claudia.png", reward:20}),
+    ...Array(4).fill({type:"rei", img:"o_rei.png", reward:10}),
+    ...Array(3).fill({type:"gabriela", img:"gabriela.png", reward:3}),
+    ...Array(3).fill({type:"felipe", img:"felipe_genro.png", reward:3}),
+    ...Array(3).fill({type:"mateus", img:"mateus.png", reward:3}),
+    ...Array(3).fill({type:"bruna", img:"bruna_nora.png", reward:3}),
+    {type:"n1", label:"⭐"},
+    {type:"n2", label:"❤️"},
+    {type:"n3", label:"●"}
+];
+
+function rand(){ return symbols[Math.floor(Math.random()*symbols.length)]; }
+
+let result = Array.from({length:9}, ()=>rand());
+drawGrid(result);
+
+function drawGrid(r, winLine=[]){
+    gridEl.innerHTML="";
+    r.forEach((s,i)=>{
+        const c=document.createElement("div");
+        c.className="cell"+(winLine.includes(i)?" win":"");
+        if(s.img){
+            const img=document.createElement("img");
+            img.src=s.img;
+            c.appendChild(img);
+        }else{
+            c.innerText=s.label;
+        }
+        gridEl.appendChild(c);
+    });
+}
+
+function updateBet(){
+    bet = +document.getElementById("bet").value;
+    document.getElementById("betValue").innerText = bet;
+}
+
+function spin(){
+    if(spinning || points < bet) return;
+    audioCtx.resume();
+    spinning=true;
+
+    points -= bet;
+    pointsEl.innerText = points;
+    statusEl.innerText = "Girando... 🎰";
+
+    let col=0;
+
+    function spinColumn(){
+        if(col>2){
+            checkWin(result);
+            spinning=false;
+            return;
+        }
+        let spins=0;
+        const interval=setInterval(()=>{
+            spinSound();
+            for(let row=0;row<3;row++){
+                result[row*3+col]=rand();
+            }
+            drawGrid(result);
+            spins++;
+            if(spins>10){
+                clearInterval(interval);
+                stopSound();
+                col++;
+                setTimeout(spinColumn,250);
+            }
+        },90);
+    }
+    spinColumn();
+}
+
+function checkWin(r){
+    const lines=[[0,1,2],[3,4,5],[6,7,8],[0,4,8],[2,4,6]];
+    let win=0, winLine=[];
+    lines.forEach(l=>{
+        const a=r[l[0]],b=r[l[1]],c=r[l[2]];
+        if(a.type===b.type && b.type===c.type && a.reward){
+            win+=a.reward*bet;
+            winLine=l;
+        }
+    });
+    if(win){
+        points+=win;
+        winSound();
+        statusEl.innerText=`🎉 Ganhou ${win} pontos!`;
+        drawGrid(r, winLine);
+    }else{
+        loseSound();
+        statusEl.innerText="😢 Não foi dessa vez";
+    }
+    pointsEl.innerText=points;
+}
+</script>
+
+</body>
+</html>
