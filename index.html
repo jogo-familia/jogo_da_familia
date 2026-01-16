@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-br">
 <head>
 <meta charset="UTF-8">
@@ -70,12 +70,12 @@ body{
 
 .cell.win{
     border-color:#ff7b00;
-    box-shadow:0 0 15px #ff7b00;
+    box-shadow:0 0 18px #ff7b00;
 }
 
 .cell img{
-    width:98%;
-    height:98%;
+    width:100%;
+    height:100%;
     object-fit:cover;
     border-radius:50%;
 }
@@ -116,7 +116,7 @@ button:active{
     text-align:center;
     font-weight:900;
     margin-top:8px;
-    min-height:24px;
+    min-height:26px;
 }
 </style>
 </head>
@@ -187,6 +187,11 @@ function winSound(){
     setTimeout(()=>playSound(800,0.12),120);
     setTimeout(()=>playSound(1000,0.15),240);
 }
+function megaWinSound(){
+    playSound(900,0.15);
+    setTimeout(()=>playSound(1200,0.2),160);
+    setTimeout(()=>playSound(1500,0.25),320);
+}
 function loseSound(){ playSound(90,0.25,"triangle"); }
 
 let musicOsc=null, musicOn=false;
@@ -209,17 +214,14 @@ function toggleMusic(){
 }
 function setVolume(v){ masterGain.gain.value=v/100; }
 
-/* 🎰 símbolos */
+/* 🎰 símbolos — SOMENTE FAMÍLIA */
 const symbols = [
     ...Array(4).fill({type:"ana", img:"ana_claudia.png", reward:20}),
-    ...Array(4).fill({type:"rei", img:"o_rei.png", reward:10}),
-    ...Array(3).fill({type:"gabriela", img:"gabriela.png", reward:3}),
-    ...Array(3).fill({type:"felipe", img:"felipe_genro.png", reward:3}),
-    ...Array(3).fill({type:"mateus", img:"mateus.png", reward:3}),
-    ...Array(3).fill({type:"bruna", img:"bruna_nora.png", reward:3}),
-    {type:"n1", label:"⭐"},
-    {type:"n2", label:"❤️"},
-    {type:"n3", label:"●"}
+    ...Array(4).fill({type:"rei", img:"o_rei.png", reward:15}),
+    ...Array(3).fill({type:"gabriela", img:"gabriela.png", reward:5}),
+    ...Array(3).fill({type:"felipe", img:"felipe_genro.png", reward:5}),
+    ...Array(3).fill({type:"mateus", img:"mateus.png", reward:5}),
+    ...Array(3).fill({type:"bruna", img:"bruna_nora.png", reward:5})
 ];
 
 function rand(){ return symbols[Math.floor(Math.random()*symbols.length)]; }
@@ -232,13 +234,9 @@ function drawGrid(r, winLine=[]){
     r.forEach((s,i)=>{
         const c=document.createElement("div");
         c.className="cell"+(winLine.includes(i)?" win":"");
-        if(s.img){
-            const img=document.createElement("img");
-            img.src=s.img;
-            c.appendChild(img);
-        }else{
-            c.innerText=s.label;
-        }
+        const img=document.createElement("img");
+        img.src=s.img;
+        c.appendChild(img);
         gridEl.appendChild(c);
     });
 }
@@ -277,7 +275,7 @@ function spin(){
                 clearInterval(interval);
                 stopSound();
                 col++;
-                setTimeout(spinColumn,250);
+                setTimeout(spinColumn,220);
             }
         },90);
     }
@@ -287,18 +285,27 @@ function spin(){
 function checkWin(r){
     const lines=[[0,1,2],[3,4,5],[6,7,8],[0,4,8],[2,4,6]];
     let win=0, winLine=[];
+    let special=false;
+
     lines.forEach(l=>{
         const a=r[l[0]],b=r[l[1]],c=r[l[2]];
-        if(a.type===b.type && b.type===c.type && a.reward){
+        if(a.type===b.type && b.type===c.type){
             win+=a.reward*bet;
             winLine=l;
+            if(a.type==="ana" || a.type==="rei") special=true;
         }
     });
+
     if(win){
         points+=win;
-        winSound();
-        statusEl.innerText=`🎉 Ganhou ${win} pontos!`;
         drawGrid(r, winLine);
+        if(special){
+            megaWinSound();
+            statusEl.innerText="🔥🎉 UAAAAUUUUUU!!! 🎉🔥";
+        }else{
+            winSound();
+            statusEl.innerText=`🎉 Ganhou ${win} pontos!`;
+        }
     }else{
         loseSound();
         statusEl.innerText="😢 Não foi dessa vez";
@@ -309,4 +316,3 @@ function checkWin(r){
 
 </body>
 </html>
-
